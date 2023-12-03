@@ -53,9 +53,6 @@ echo "rescuesystem" > $root_mount/etc/hostname
 echo "KEYMAP=de" > $root_mount/etc/vconsole.conf
 echo "KEYMAP_TOGGLE=neo" >> $root_mount/etc/vconsole.conf
 
-root_fs_uuid=$(blkid -s UUID -o value $root_loop)
-echo 'kernel_cmdline="root=UUID='$root_fs_uuid'"' > $root_mount/etc/dracut.conf.d/cmdline.conf
-
 mkdir -p $root_mount/etc/systemd/system/getty@tty1.service.d
 cat <<EOF > $root_mount/etc/systemd/system/getty@tty1.service.d/autologin.conf
 [Service]
@@ -70,9 +67,40 @@ arch-chroot $root_mount localectl set-x11-keymap de neo
 mkdir -p $efi_mount/EFI/BOOT
 
 kernel_version=$(ls $root_mount/usr/lib/modules | jq -R | jq -s -c | jq -r '.[0]')
+
+# create efi kernel for iso booting
+echo 'kernel_cmdline="iso-scan/filename=rootfs.sfs root=/run/initramfs/isoscandev/rootfs.sfs rootfstype=sqashfs"' > $root_mount/etc/dracut.conf.d/liveiso.conf
 arch-chroot $root_mount dracut --force --uefi --uefi-stub /usr/lib/systemd/boot/efi/linuxx64.efi.stub /boot/efi/EFI/BOOT/BOOTX64.EFI --kver $kernel_version
+sync
+
+iso_dir=$build_dir/iso
+mkdir -p $iso_dir
+
+dd if=$efi_loop of=$iso_dir/efi.img status=progress
+
+# overwrite efi kernel image for disk image boot
+root_fs_uuid=$(blkid -s UUID -o value $root_loop)
+rm $root_mount/etc/dracut.conf.d/liveiso.conf
+echo 'kernel_cmdline="root=UUID='$root_fs_uuid'"' > $root_mount/etc/dracut.conf.d/cmdline.conf
+arch-chroot $root_mount dracut --force --uefi --uefi-stub /usr/lib/systemd/boot/efi/linuxx64.efi.stub /boot/efi/EFI/BOOT/BOOTX64.EFI --kver $kernel_version
+
+mksquashfs $root_mount $iso_dir/rootfs.sfs -comp xz
+mkdir -p $iso_dir/isolinux
+cp /usr/lib/syslinux/bios/isolinux.bin $iso_dir/isolinux
+
+xorriso -as mkisofs \
+  -o $build_dir/output.iso \
+  -isohybrid-mbr /usr/lib/syslinux/bios/isohdpfx.bin \
+  -b isolinux/isolinux.bin \
+   -no-emul-boot -boot-load-size 4 -boot-info-table \
+  -eltorito-alt-boot \
+  -e efi.img \
+   -no-emul-boot \
+   -isohybrid-gpt-basdat \
+  $iso_dir
 
 umount $efi_mount
 umount $root_mount
 losetup -d $efi_loop
 losetup -d $root_loop
+
