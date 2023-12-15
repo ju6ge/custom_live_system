@@ -9,8 +9,8 @@ build_dir=/tmp/rescue_system
 
 mkdir -p $build_dir
 
-rescue_img=$build_dir/rescue_arch_zfs.img
-rescue_iso=$build_dir/rescue_arch.iso
+rescue_img=$build_dir/rescue.img
+rescue_iso=$build_dir/rescue.iso
 
 dd if=/dev/zero of=$rescue_img bs=1M count=10000 2>/dev/null
 echo "Created $rescue_img"
@@ -52,10 +52,33 @@ mount $root_loop $root_mount
 mkdir -p $efi_mount
 mount $efi_loop $efi_mount
 
-pacstrap $root_mount base base-devel dracut linux-lts linux-lts-headers linux-firmware dkms zfs-dkms squashfs-tools vim rust git efibootmgr efivar netcat iwd
+pacstrap $root_mount base \
+                     base-devel \
+                     dracut \
+                     linux-lts \
+                     linux-lts-headers \
+                     linux-firmware \
+                     util-linux \
+                     dkms \
+                     zfs-dkms \
+                     squashfs-tools \
+                     vim \
+                     rust \
+                     git \
+                     efibootmgr \
+                     efivar \
+                     gnu-netcat \
+                     iwd \
+                     jq \
+                     curl \
+                     fakeroot \
+                     clang \
+                     zsh \
+                     cdrkit
 
 #copy dracut module source to system
 cp -r $source_dir/89ventoy $root_mount/usr/lib/dracut/modules.d
+cp -r $source_dir $root_mount/root/create_rescue_iso
 
 echo "rescuesystem" > $root_mount/etc/hostname
 echo "KEYMAP=de" > $root_mount/etc/vconsole.conf
