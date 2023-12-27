@@ -76,6 +76,11 @@ pacstrap $root_mount base \
                      zsh \
                      cdrkit
 
+efi_tool_url=$(curl https://api.github.com/repos/ju6ge/dracut-efi-manager/releases/latest | jq -r ' .assets[] | select( .name | endswith("zip") ) | .browser_download_url ')
+
+curl -sSL $efi_tool_url -o /tmp/dracut-efi-manager.zip && unzip -o /tmp/dracut-efi-manager.zip dracut-efi-manager -d $root_mount/bin && rm /tmp/dracut-efi-manager.zip
+fi_tool_url
+
 #copy dracut module source to system
 cp -r $source_dir/89ventoy $root_mount/usr/lib/dracut/modules.d
 cp -r $source_dir $root_mount/root/create_rescue_iso
